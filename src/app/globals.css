@@ -1,0 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --asnb-green: #006747;
+  --asnb-dark-green: #004d35;
+  --asnb-gold: #C8A951;
+  --asnb-light: #E8F5EE;
+  --asnb-muted: #F0F7F4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #f8faf9;
+  color: #1a2e25;
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-green-100 p-6;
+  }
+
+  .btn-primary {
+    @apply bg-[#006747] hover:bg-[#004d35] text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply bg-white hover:bg-[#E8F5EE] text-[#006747] font-semibold px-6 py-3 rounded-xl border border-[#006747] transition-all duration-200 active:scale-95;
+  }
+
+  .btn-ghost {
+    @apply hover:bg-[#E8F5EE] text-[#006747] font-medium px-4 py-2 rounded-lg transition-all duration-200;
+  }
+
+  .tab-active {
+    @apply bg-[#006747] text-white shadow-sm;
+  }
+
+  .tab-inactive {
+    @apply text-gray-500 hover:text-[#006747] hover:bg-[#E8F5EE];
+  }
+
+  .input-field {
+    @apply w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#006747]/30 focus:border-[#006747] transition-all bg-white;
+  }
+
+  .label {
+    @apply block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5;
+  }
+
+  .stat-card {
+    @apply bg-gradient-to-br from-[#006747] to-[#004d35] text-white rounded-2xl p-5 shadow-md;
+  }
+
+  .stat-card-gold {
+    @apply bg-gradient-to-br from-[#C8A951] to-[#a88935] text-white rounded-2xl p-5 shadow-md;
+  }
+}
