@@ -21,6 +21,20 @@ body {
   color: #1a2e25;
 }
 
+/* iOS Safari renders the date input's text via its own internal
+   ::-webkit-date-and-time-value element, which is center-aligned by
+   default and ignores the input's own text-align — unlike desktop/
+   Android Chrome, which lay it out left-aligned like normal text. */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 @layer components {
   .card {
     @apply bg-white rounded-2xl shadow-sm border border-green-100 p-6;
