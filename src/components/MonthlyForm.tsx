@@ -274,9 +274,10 @@ export default function MonthlyForm({ fund, onCalculate }: Props) {
             )}
 
             {withdrawals.map((w, idx) => (
-              <div key={w.id} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center bg-red-50 rounded-xl px-3 py-2.5 border border-red-100">
+              <div key={w.id} className="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_1fr_auto] sm:items-center bg-red-50 rounded-xl px-3 py-2.5 border border-red-100">
                 <div>
-                  {idx === 0 && <label className="label mb-1">Withdrawal Date</label>}
+                  <label className="label mb-1 sm:hidden">Withdrawal Date</label>
+                  {idx === 0 && <label className="label mb-1 hidden sm:block">Withdrawal Date</label>}
                   <input
                     type="date"
                     className="input-field text-sm py-2 border-red-200 focus:border-red-400 focus:ring-red-100"
@@ -284,25 +285,26 @@ export default function MonthlyForm({ fund, onCalculate }: Props) {
                     onChange={(e) => updateWithdrawal(w.id, "date", e.target.value)}
                   />
                 </div>
-                <div>
-                  {idx === 0 && <label className="label mb-1">Amount (RM)</label>}
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-red-400 text-xs font-semibold">−RM</span>
-                    <input
-                      type="number"
-                      className="input-field pl-10 text-sm py-2 border-red-200 focus:border-red-400 focus:ring-red-100 text-red-600"
-                      min={0}
-                      step="100"
-                      placeholder="0"
-                      value={w.amount}
-                      onChange={(e) => updateWithdrawal(w.id, "amount", e.target.value)}
-                    />
+                <div className="flex gap-2 items-end sm:contents">
+                  <div className="flex-1 min-w-0">
+                    <label className="label mb-1 sm:hidden">Amount (RM)</label>
+                    {idx === 0 && <label className="label mb-1 hidden sm:block">Amount (RM)</label>}
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-red-400 text-xs font-semibold">−RM</span>
+                      <input
+                        type="number"
+                        className="input-field pl-10 text-sm py-2 border-red-200 focus:border-red-400 focus:ring-red-100 text-red-600"
+                        min={0}
+                        step="100"
+                        placeholder="0"
+                        value={w.amount}
+                        onChange={(e) => updateWithdrawal(w.id, "amount", e.target.value)}
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className={idx === 0 ? "mt-5" : ""}>
                   <button
                     onClick={() => removeWithdrawal(w.id)}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-white transition-all"
+                    className={`p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-white transition-all shrink-0 ${idx === 0 ? "sm:mt-5" : ""}`}
                   >
                     <Trash2 size={14} />
                   </button>

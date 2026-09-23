@@ -154,8 +154,8 @@ export default function PeriodicForm({ fund, onCalculate }: Props) {
         </div>
 
         <div className="space-y-2">
-          {/* Column headers */}
-          <div className="grid grid-cols-[32px_1fr_1fr_1fr_56px] gap-2 px-1">
+          {/* Column headers (desktop only) */}
+          <div className="hidden sm:grid grid-cols-[32px_1fr_1fr_1fr_56px] gap-2 px-1">
             <span />
             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Type</span>
             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Date</span>
@@ -168,39 +168,54 @@ export default function PeriodicForm({ fund, onCalculate }: Props) {
             return (
               <div
                 key={idx}
-                className={`grid grid-cols-[32px_1fr_1fr_1fr_56px] gap-2 items-center rounded-xl px-3 py-2.5 border transition-all ${
+                className={`flex flex-col gap-2 sm:grid sm:grid-cols-[32px_1fr_1fr_1fr_56px] sm:items-center rounded-xl px-3 py-2.5 border transition-all ${
                   isW
                     ? "bg-red-50 border-red-100 hover:border-red-200"
                     : "bg-gray-50 border-gray-100 hover:border-[#006747]/20"
                 }`}
               >
-                <span className="text-xs text-gray-400 font-medium text-center">{idx + 1}</span>
+                {/* Index + (mobile) row actions */}
+                <div className="flex items-center justify-between gap-2 sm:contents">
+                  <span className="text-xs text-gray-400 font-medium text-center">{idx + 1}</span>
+
+                  {/* Row actions (mobile position) */}
+                  <div className="flex gap-1 sm:hidden">
+                    <button onClick={() => duplicateRow(idx)} title="Duplicate" className="p-1.5 rounded-lg text-gray-400 hover:text-[#006747] hover:bg-white transition-all">
+                      <Copy size={13} />
+                    </button>
+                    <button onClick={() => removeRow(idx)} title="Remove" className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-white transition-all" disabled={transactions.length <= 1}>
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
 
                 {/* Type toggle */}
-                <div className="flex gap-1">
+                <div className="flex gap-1.5">
                   <button
                     onClick={() => updateField(idx, "type", "deposit")}
                     title="Deposit"
-                    className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    className={`flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-2 py-2 sm:py-1.5 rounded-lg text-xs font-semibold transition-all ${
                       !isW
                         ? "bg-[#006747] text-white"
                         : "bg-white border border-gray-200 text-gray-400 hover:text-[#006747]"
                     }`}
                   >
-                    <ArrowDownCircle size={12} />
-                    <span className="hidden sm:inline">Deposit</span>
+                    <ArrowDownCircle size={14} className="sm:hidden" />
+                    <ArrowDownCircle size={12} className="hidden sm:block" />
+                    <span>Deposit</span>
                   </button>
                   <button
                     onClick={() => updateField(idx, "type", "withdrawal")}
                     title="Withdrawal"
-                    className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    className={`flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-2 py-2 sm:py-1.5 rounded-lg text-xs font-semibold transition-all ${
                       isW
                         ? "bg-red-500 text-white"
                         : "bg-white border border-gray-200 text-gray-400 hover:text-red-500"
                     }`}
                   >
-                    <ArrowUpCircle size={12} />
-                    <span className="hidden sm:inline">Withdraw</span>
+                    <ArrowUpCircle size={14} className="sm:hidden" />
+                    <ArrowUpCircle size={12} className="hidden sm:block" />
+                    <span>Withdraw</span>
                   </button>
                 </div>
 
@@ -228,8 +243,8 @@ export default function PeriodicForm({ fund, onCalculate }: Props) {
                   />
                 </div>
 
-                {/* Row actions */}
-                <div className="flex gap-1">
+                {/* Row actions (desktop position) */}
+                <div className="hidden sm:flex gap-1">
                   <button onClick={() => duplicateRow(idx)} title="Duplicate" className="p-1.5 rounded-lg text-gray-400 hover:text-[#006747] hover:bg-white transition-all">
                     <Copy size={13} />
                   </button>
