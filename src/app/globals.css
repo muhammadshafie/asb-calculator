@@ -1,78 +1,194 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --asnb-green: #006747;
-  --asnb-dark-green: #004d35;
-  --asnb-gold: #C8A951;
-  --asnb-light: #E8F5EE;
-  --asnb-muted: #F0F7F4;
+  color-scheme: light;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 64px;
+}
+
 body {
-  background-color: #f8faf9;
-  color: #1a2e25;
+  background-color: #f5f5f7;
+  color: #1d1d1f;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Money and dates line up in columns. */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 /* iOS Safari renders the date input's text via its own internal
    ::-webkit-date-and-time-value element, which is center-aligned by
    default and ignores the input's own text-align — unlike desktop/
    Android Chrome, which lay it out left-aligned like normal text. */
-input[type="date"] {
-  -webkit-appearance: none;
-  appearance: none;
-  text-align: left;
+/* Date fields
+   Safari (iOS and macOS) ignores most styling on a bare date input: the text
+   sits at the top of the box, an empty field collapses, and there is no
+   calendar icon. So the visible box is a wrapper (.date-field) that we fully
+   control, and the native input inside it is stripped back to just its text.
+   The icon is ours, so it shows in every browser. */
+.date-field {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  border: 1px solid #d2d2d7;
+  border-radius: 12px;
+  background: #fff;
 }
 
-input[type="date"]::-webkit-date-and-time-value {
+.date-field:focus-within {
+  border-color: #0071e3;
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15);
+}
+
+.date-field input {
+  -webkit-appearance: none;
+  appearance: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0 44px 0 16px;
+  border: 0;
+  border-radius: 12px;
+  outline: none;
+  background: transparent;
+  color: #1d1d1f;
+  font: inherit;
+  font-size: 17px; /* 16px+ stops iOS zooming on focus */
+  /* Line height = inner box height, so the text is centred vertically
+     without relying on flexbox inside the input (Safari has none there). */
+  line-height: 46px;
   text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+/* iOS Safari centres the value by default. */
+.date-field input::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+  line-height: 46px;
+}
+
+.date-field input::-webkit-datetime-edit {
+  padding: 0;
+  line-height: 46px;
+}
+
+.date-field input::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
+/* Chrome/Edge/Android: hide the built-in icon but stretch its tap area over
+   the whole field, so tapping anywhere opens the picker. */
+.date-field input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.date-field-icon {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 18px;
+  height: 18px;
+  margin-top: -9px;
+  color: #6e6e73;
+  pointer-events: none;
+}
+
+/* Number steppers add clutter and are hard to hit on touch screens. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+:focus-visible {
+  outline: 2px solid #0071e3;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer components {
   .card {
-    @apply bg-white rounded-2xl shadow-sm border border-green-100 p-6;
+    @apply bg-white rounded-tile p-5 sm:p-8;
   }
 
-  .btn-primary {
-    @apply bg-[#006747] hover:bg-[#004d35] text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95;
+  .card-title {
+    @apply text-[21px] sm:text-2xl font-semibold tracking-tight text-ink;
   }
 
-  .btn-secondary {
-    @apply bg-white hover:bg-[#E8F5EE] text-[#006747] font-semibold px-6 py-3 rounded-xl border border-[#006747] transition-all duration-200 active:scale-95;
-  }
-
-  .btn-ghost {
-    @apply hover:bg-[#E8F5EE] text-[#006747] font-medium px-4 py-2 rounded-lg transition-all duration-200;
-  }
-
-  .tab-active {
-    @apply bg-[#006747] text-white shadow-sm;
-  }
-
-  .tab-inactive {
-    @apply text-gray-500 hover:text-[#006747] hover:bg-[#E8F5EE];
-  }
-
+  /* 17px text keeps iOS from zooming the page when a field is focused. */
   .input-field {
-    @apply w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#006747]/30 focus:border-[#006747] transition-all bg-white;
+    @apply w-full h-12 rounded-xl border border-hairline bg-white px-4 text-[17px] text-ink
+      placeholder:text-[#a1a1a6] transition-shadow
+      focus:outline-none focus:border-action focus:ring-4 focus:ring-action/15;
   }
 
   .label {
-    @apply block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5;
+    @apply block text-sm font-medium text-ink mb-2;
   }
 
-  .stat-card {
-    @apply bg-gradient-to-br from-[#006747] to-[#004d35] text-white rounded-2xl p-5 shadow-md;
+  .hint {
+    @apply text-[13px] leading-snug text-sub mt-2;
   }
 
-  .stat-card-gold {
-    @apply bg-gradient-to-br from-[#C8A951] to-[#a88935] text-white rounded-2xl p-5 shadow-md;
+  .btn-primary {
+    @apply inline-flex items-center justify-center h-12 px-7 rounded-full bg-action text-white
+      text-[17px] font-medium transition-colors hover:bg-action-hover active:bg-[#006edb];
+  }
+
+  /* Option buttons sit in a wrapping grid (.chip-grid): every choice is
+     visible at once, with nothing hidden behind a sideways swipe. */
+  .chip {
+    @apply flex items-center justify-center min-h-[44px] px-2 py-1.5 rounded-xl border border-hairline
+      bg-white text-center text-sm font-medium leading-tight text-ink transition-colors hover:border-[#86868b];
+  }
+
+  .chip-grid {
+    @apply grid gap-2;
+  }
+
+  .chip-active {
+    @apply bg-ink border-ink text-white hover:border-ink;
+  }
+
+  .icon-btn {
+    @apply inline-flex items-center justify-center w-11 h-11 rounded-full text-sub transition-colors
+      hover:bg-black/5 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent;
   }
 }

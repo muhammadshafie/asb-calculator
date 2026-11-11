@@ -1,38 +1,47 @@
 "use client";
 
 import { useState } from "react";
-import { Transaction, TransactionType, ASNBFund } from "@/lib/calculator";
-import { Plus, Trash2, Copy, ArrowDownCircle, ArrowUpCircle, Info } from "lucide-react";
+import { Transaction, TransactionType, ASNBFund, addMonthsISO, todayISO } from "@/lib/calculator";
+import { Plus, Trash2, Copy } from "lucide-react";
+import { DateInput, Field, MoneyInput, OpeningBalance, Segmented, SubmitBar, Summary, money } from "@/components/ui";
 
 interface Props {
   fund: ASNBFund;
   onCalculate: (transactions: Transaction[], endDate: string, initialBalance: number) => void;
 }
 
-const today = new Date().toISOString().split("T")[0];
-const in3months = (() => {
-  const d = new Date();
-  d.setMonth(d.getMonth() + 3);
-  return d.toISOString().split("T")[0];
-})();
+const today = todayISO();
+const in3months = addMonthsISO(today, 3);
 
 const DEFAULT_ROWS: Transaction[] = [
   { date: today, amount: 5000, type: "deposit" },
   { date: in3months, amount: 3000, type: "deposit" },
 ];
 
-export default function PeriodicForm({ fund, onCalculate }: Props) {
+type Preset = "quarterly" | "yearly" | "bonus" | "mixed";
+
+const PRESETS: { id: Preset; label: string }[] = [
+  { id: "quarterly", label: "Quarterly" },
+  { id: "yearly", label: "Yearly for 3 years" },
+  { id: "bonus", label: "Salary and bonus" },
+  { id: "mixed", label: "With withdrawals" },
+];
+
+const TYPE_OPTIONS: { id: TransactionType; label: string }[] = [
+  { id: "deposit", label: "Deposit" },
+  { id: "withdrawal", label: "Withdraw" },
+];
+
+export default function PeriodicForm({ onCalculate }: Props) {
   const [initialBalance, setInitialBalance] = useState("");
   const [transactions, setTransactions] = useState<Transaction[]>(DEFAULT_ROWS);
   const [endDate, setEndDate] = useState(`${new Date().getFullYear()}-12-31`);
 
   const addRow = () => {
     const last = transactions[transactions.length - 1];
-    const next = new Date((last?.date ?? today) + "T00:00:00");
-    next.setMonth(next.getMonth() + 1);
     setTransactions([
       ...transactions,
-      { date: next.toISOString().split("T")[0], amount: 0, type: "deposit" },
+      { date: addMonthsISO(last?.date ?? today, 1), amount: 0, type: "deposit" },
     ]);
   };
 
@@ -41,10 +50,8 @@ export default function PeriodicForm({ fund, onCalculate }: Props) {
 
   const duplicateRow = (idx: number) => {
     const row = transactions[idx];
-    const d = new Date(row.date + "T00:00:00");
-    d.setMonth(d.getMonth() + 1);
     const updated = [...transactions];
-    updated.splice(idx + 1, 0, { ...row, date: d.toISOString().split("T")[0] });
+    updated.splice(idx + 1, 0, { ...row, date: addMonthsISO(row.date, 1) });
     setTransactions(updated);
   };
 
@@ -64,7 +71,7 @@ export default function PeriodicForm({ fund, onCalculate }: Props) {
     onCalculate(valid, endDate, initBal);
   };
 
-  const applyPreset = (preset: "quarterly" | "yearly" | "bonus" | "mixed") => {
+  const applyPreset = (preset: Preset) => {
     const year = new Date().getFullYear();
     if (preset === "quarterly") {
       setTransactions([
@@ -100,220 +107,116 @@ export default function PeriodicForm({ fund, onCalculate }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* ── Opening Balance ───────────────────────────── */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
-        <div className="flex items-start gap-2">
-          <Info size={15} className="text-amber-600 mt-0.5 shrink-0" />
-          <p className="text-xs text-amber-700 font-medium">
-            Already have existing savings? Enter your current total balance so the calculator starts from your actual position.
-          </p>
-        </div>
-        <div className="max-w-xs">
-          <label className="label">Opening Balance (RM) — optional</label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 font-semibold text-sm">RM</span>
-            <input
-              type="number"
-              className="input-field pl-10 border-amber-200 focus:border-amber-400 focus:ring-amber-200"
-              min={0}
-              step="100"
-              placeholder="e.g. 25000"
-              value={initialBalance}
-              onChange={(e) => setInitialBalance(e.target.value)}
-            />
-          </div>
-        </div>
-      </div>
+      <OpeningBalance value={initialBalance} onChange={setInitialBalance} />
 
-      {/* ── Presets ───────────────────────────────────── */}
       <div>
-        <p className="label mb-2">Quick Presets</p>
-        <div className="flex flex-wrap gap-2">
-          {[
-            { id: "quarterly" as const, label: "Quarterly (4×)", icon: "🗓️" },
-            { id: "yearly" as const, label: "Annual 3yr", icon: "📆" },
-            { id: "bonus" as const, label: "Salary + Bonus", icon: "💼" },
-            { id: "mixed" as const, label: "Deposit + Withdraw", icon: "🔄" },
-          ].map((p) => (
-            <button
-              key={p.id}
-              onClick={() => applyPreset(p.id)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-gray-200 hover:border-[#006747]/50 hover:bg-[#E8F5EE] text-gray-600 transition-all"
-            >
-              {p.icon} {p.label}
+        <p className="label">Start from an example</p>
+        <div className="chip-grid grid-cols-2 sm:grid-cols-4">
+          {PRESETS.map((p) => (
+            <button key={p.id} type="button" onClick={() => applyPreset(p.id)} className="chip">
+              {p.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ── Transaction rows ──────────────────────────── */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <p className="label">Transactions</p>
-          <span className="text-xs text-gray-400">{transactions.length} entries</span>
+        <div className="mb-2 flex items-baseline justify-between">
+          <p className="text-sm font-medium text-ink">Transactions</p>
+          <span className="tabular text-[13px] text-sub">
+            {transactions.length} {transactions.length === 1 ? "entry" : "entries"}
+          </span>
         </div>
 
-        <div className="space-y-2">
-          {/* Column headers (desktop only) */}
-          <div className="hidden sm:grid grid-cols-[32px_1fr_1fr_1fr_56px] gap-2 px-1">
-            <span />
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Type</span>
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Date</span>
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Amount (RM)</span>
-            <span />
-          </div>
-
+        <ol className="space-y-2">
           {transactions.map((tx, idx) => {
             const isW = tx.type === "withdrawal";
             return (
-              <div
+              <li
                 key={idx}
-                className={`flex flex-col gap-2 sm:grid sm:grid-cols-[32px_1fr_1fr_1fr_56px] sm:items-center rounded-xl px-3 py-2.5 border transition-all ${
-                  isW
-                    ? "bg-red-50 border-red-100 hover:border-red-200"
-                    : "bg-gray-50 border-gray-100 hover:border-[#006747]/20"
-                }`}
+                className="grid gap-2 rounded-2xl bg-fog p-3 sm:grid-cols-[190px_1fr_1fr_auto] sm:items-center sm:p-2"
               >
-                {/* Index + (mobile) row actions */}
-                <div className="flex items-center justify-between gap-2 sm:contents">
-                  <span className="text-xs text-gray-400 font-medium text-center">{idx + 1}</span>
-
-                  {/* Row actions (mobile position) */}
-                  <div className="flex gap-1 sm:hidden">
-                    <button onClick={() => duplicateRow(idx)} title="Duplicate" className="p-1.5 rounded-lg text-gray-400 hover:text-[#006747] hover:bg-white transition-all">
-                      <Copy size={13} />
+                <div className="flex items-center gap-1 sm:contents">
+                  <div className="flex-1 sm:flex-none">
+                    <Segmented
+                      compact
+                      label={`Transaction ${idx + 1} type`}
+                      options={TYPE_OPTIONS}
+                      value={tx.type}
+                      onChange={(t) => updateField(idx, "type", t)}
+                    />
+                  </div>
+                  <div className="flex sm:order-last">
+                    <button
+                      type="button"
+                      onClick={() => duplicateRow(idx)}
+                      aria-label={`Duplicate transaction ${idx + 1} one month later`}
+                      className="icon-btn"
+                    >
+                      <Copy size={17} />
                     </button>
-                    <button onClick={() => removeRow(idx)} title="Remove" className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-white transition-all" disabled={transactions.length <= 1}>
-                      <Trash2 size={13} />
+                    <button
+                      type="button"
+                      onClick={() => removeRow(idx)}
+                      aria-label={`Remove transaction ${idx + 1}`}
+                      className="icon-btn hover:text-loss"
+                      disabled={transactions.length <= 1}
+                    >
+                      <Trash2 size={17} />
                     </button>
                   </div>
                 </div>
 
-                {/* Type toggle */}
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => updateField(idx, "type", "deposit")}
-                    title="Deposit"
-                    className={`flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-2 py-2 sm:py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                      !isW
-                        ? "bg-[#006747] text-white"
-                        : "bg-white border border-gray-200 text-gray-400 hover:text-[#006747]"
-                    }`}
-                  >
-                    <ArrowDownCircle size={14} className="sm:hidden" />
-                    <ArrowDownCircle size={12} className="hidden sm:block" />
-                    <span>Deposit</span>
-                  </button>
-                  <button
-                    onClick={() => updateField(idx, "type", "withdrawal")}
-                    title="Withdrawal"
-                    className={`flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-2 py-2 sm:py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                      isW
-                        ? "bg-red-500 text-white"
-                        : "bg-white border border-gray-200 text-gray-400 hover:text-red-500"
-                    }`}
-                  >
-                    <ArrowUpCircle size={14} className="sm:hidden" />
-                    <ArrowUpCircle size={12} className="hidden sm:block" />
-                    <span>Withdraw</span>
-                  </button>
-                </div>
+                <DateInput ariaLabel={`Transaction ${idx + 1} date`} value={tx.date} onChange={(v) => updateField(idx, "date", v)} />
 
-                {/* Date */}
-                <input
-                  type="date"
-                  className={`input-field text-sm py-2 ${isW ? "border-red-200 focus:border-red-400 focus:ring-red-100" : ""}`}
-                  value={tx.date}
-                  onChange={(e) => updateField(idx, "date", e.target.value)}
+                <MoneyInput
+                  ariaLabel={`Transaction ${idx + 1} amount`}
+                  prefix={isW ? "−RM" : "+RM"}
+                  negative={isW}
+                  value={tx.amount || ""}
+                  onChange={(v) => updateField(idx, "amount", parseFloat(v) || 0)}
+                  placeholder="0"
                 />
-
-                {/* Amount */}
-                <div className="relative">
-                  <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold ${isW ? "text-red-400" : "text-gray-400"}`}>
-                    {isW ? "−RM" : "+RM"}
-                  </span>
-                  <input
-                    type="number"
-                    className={`input-field pl-10 text-sm py-2 ${isW ? "border-red-200 focus:border-red-400 focus:ring-red-100 text-red-600" : "text-[#006747]"}`}
-                    min={0}
-                    step="100"
-                    value={tx.amount || ""}
-                    onChange={(e) => updateField(idx, "amount", parseFloat(e.target.value) || 0)}
-                    placeholder="0"
-                  />
-                </div>
-
-                {/* Row actions (desktop position) */}
-                <div className="hidden sm:flex gap-1">
-                  <button onClick={() => duplicateRow(idx)} title="Duplicate" className="p-1.5 rounded-lg text-gray-400 hover:text-[#006747] hover:bg-white transition-all">
-                    <Copy size={13} />
-                  </button>
-                  <button onClick={() => removeRow(idx)} title="Remove" className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-white transition-all" disabled={transactions.length <= 1}>
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ol>
 
         <button
+          type="button"
           onClick={addRow}
-          className="mt-3 flex items-center gap-2 text-sm text-[#006747] font-semibold hover:bg-[#E8F5EE] px-3 py-2 rounded-lg transition-all border border-dashed border-[#006747]/30 w-full justify-center"
+          className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 text-[17px] text-action-link hover:underline"
         >
-          <Plus size={16} /> Add Transaction
+          <Plus size={18} /> Add a transaction
         </button>
       </div>
 
-      {/* ── End Date + Summary ────────────────────────── */}
-      <div className="grid sm:grid-cols-2 gap-4 items-start">
-        <div>
-          <label className="label">Calculate Until</label>
-          <input
-            type="date"
-            className="input-field"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-          />
-        </div>
-
-        <div className="space-y-2">
-          {initBal > 0 && (
-            <div className="bg-amber-50 rounded-xl px-4 py-3 flex justify-between items-center border border-amber-100">
-              <span className="text-sm text-gray-500">Opening Balance</span>
-              <span className="font-bold text-amber-600">RM {initBal.toLocaleString("en-MY", { minimumFractionDigits: 2 })}</span>
-            </div>
+      <div className="sm:max-w-[calc(50%-0.5rem)]">
+        <Field label="Calculate until" hint="Only complete months count towards the dividend.">
+          {(id) => (
+            <DateInput id={id} value={endDate} onChange={setEndDate} />
           )}
-          {totalDeposited > 0 && (
-            <div className="bg-[#E8F5EE] rounded-xl px-4 py-3 flex justify-between items-center">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <ArrowDownCircle size={14} className="text-[#006747]" /> Deposits
-              </div>
-              <span className="font-bold text-[#006747]">RM {totalDeposited.toLocaleString("en-MY", { minimumFractionDigits: 2 })}</span>
-            </div>
-          )}
-          {totalWithdrawn > 0 && (
-            <div className="bg-red-50 rounded-xl px-4 py-3 flex justify-between items-center border border-red-100">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <ArrowUpCircle size={14} className="text-red-500" /> Withdrawn
-              </div>
-              <span className="font-bold text-red-600">RM {totalWithdrawn.toLocaleString("en-MY", { minimumFractionDigits: 2 })}</span>
-            </div>
-          )}
-          {(initBal > 0 || totalDeposited > 0 || totalWithdrawn > 0) && (
-            <div className="bg-white rounded-xl px-4 py-3 flex justify-between items-center border border-gray-100">
-              <span className="text-sm text-gray-500 font-medium">Total Capital</span>
-              <span className="font-bold text-[#006747]">
-                RM {(initBal + totalDeposited - totalWithdrawn).toLocaleString("en-MY", { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-          )}
-        </div>
+        </Field>
       </div>
 
-      <button onClick={handleSubmit} className="btn-primary w-full sm:w-auto">
-        Calculate →
-      </button>
+      {(initBal > 0 || totalDeposited > 0 || totalWithdrawn > 0) && (
+        <Summary
+          rows={[
+            ...(initBal > 0 ? [{ label: "Opening balance", value: `RM ${money(initBal)}` }] : []),
+            ...(totalDeposited > 0 ? [{ label: "Deposits", value: `RM ${money(totalDeposited)}` }] : []),
+            ...(totalWithdrawn > 0
+              ? [{ label: "Withdrawn", value: `−RM ${money(totalWithdrawn)}`, tone: "loss" as const }]
+              : []),
+            {
+              label: "Net capital",
+              value: `RM ${money(initBal + totalDeposited - totalWithdrawn)}`,
+              strong: true,
+            },
+          ]}
+        />
+      )}
+
+      <SubmitBar onClick={handleSubmit}>Calculate dividend</SubmitBar>
     </div>
   );
 }

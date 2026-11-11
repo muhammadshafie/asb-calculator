@@ -7,35 +7,65 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import { CalculationResult, formatRM, formatUnits } from "@/lib/calculator";
-import { TrendingUp, Table, BarChart2, ArrowDownCircle, ArrowUpCircle, Wallet } from "lucide-react";
+import { Segmented } from "@/components/ui";
 
 interface Props { result: CalculationResult; }
 type Tab = "overview" | "monthly" | "chart";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "monthly", label: "Monthly" },
+  { id: "chart", label: "Charts" },
+];
+
+// Chart colours
+const C_BALANCE = "#0071e3";
+const C_DIVIDEND = "#30a14e";
+const C_WITHDRAWN = "#e5484d";
+
+const compactRM = (v: number) =>
+  Math.abs(v) >= 1_000_000
+    ? `${(v / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`
+    : Math.abs(v) >= 1000
+      ? `${(v / 1000).toFixed(1).replace(/\.0$/, "")}k`
+      : `${Math.round(v)}`;
+
+const tooltipStyle = {
+  borderRadius: "14px",
+  border: "none",
+  boxShadow: "0 4px 24px rgba(0,0,0,0.12)",
+  fontSize: "13px",
+  padding: "10px 14px",
+};
 
 export default function ResultsPanel({ result }: Props) {
   const [tab, setTab] = useState<Tab>("overview");
 
   const {
-    initialBalance, totalDeposited, totalWithdrawn, netInvested,
+    initialBalance, totalDeposited, totalWithdrawn,
     totalUnits, totalDividend, effectiveRate,
-    months, dividendRate, fundName, transactions,
+    months, dividendRate, fundName, transactions, pendingDividend, fyEndMonth,
   } = result;
+  const fyEndName = ["January","February","March","April","May","June","July","August","September","October","November","December"][fyEndMonth];
+  const hasUncounted = months.some((m) => !m.counted);
 
   const hasWithdrawals = totalWithdrawn > 0;
   const hasInitial = initialBalance > 0;
   const hasDeposits = totalDeposited > 0;
   const finalBalance = totalUnits; // NAV = 1.00, so balance = units
 
+  const depositCount = transactions.filter((t) => t.type === "deposit").length;
+  const withdrawalCount = transactions.filter((t) => t.type === "withdrawal").length;
+
   // Cumulative chart
-  let cumDep = 0, cumWith = 0, cumDiv = 0;
+  let cumWith = 0, cumDiv = 0;
   const cumulativeData = months.map((m) => {
-    cumDep += m.deposited;
     cumWith += m.withdrawn;
     cumDiv += m.dividendEarned;
     return {
       name: m.month,
-      "Portfolio Value": parseFloat(m.endingBalance.toFixed(2)),
-      "Dividend Earned": parseFloat(cumDiv.toFixed(2)),
+      "Portfolio value": parseFloat(m.endingBalance.toFixed(2)),
+      "Dividend earned": parseFloat(cumDiv.toFixed(2)),
       ...(hasWithdrawals ? { "Withdrawn": parseFloat(cumWith.toFixed(2)) } : {}),
     };
   });
@@ -47,307 +77,263 @@ export default function ResultsPanel({ result }: Props) {
     Dividend: parseFloat(m.dividendEarned.toFixed(2)),
   }));
 
-  const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: "overview", label: "Overview", icon: <TrendingUp size={14} /> },
-    { id: "monthly", label: "Monthly Breakdown", icon: <Table size={14} /> },
-    { id: "chart", label: "Charts", icon: <BarChart2 size={14} /> },
-  ];
+  const netCapital = initialBalance + totalDeposited - totalWithdrawn;
+  const compTotal = netCapital + totalDividend;
+  const divPct = compTotal > 0 ? (totalDividend / compTotal) * 100 : 0;
+  const capPct = 100 - divPct;
 
   return (
-    <section className="space-y-4">
-      {/* ── Stat cards ──────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* Opening balance — only shown if provided */}
-        {hasInitial && (
-          <div className="bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-2xl p-5 shadow-md">
-            <div className="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1 flex items-center gap-1">
-              <Wallet size={12} /> Opening Balance
-            </div>
-            <div className="text-xl font-bold">{formatRM(initialBalance)}</div>
-            <div className="text-xs opacity-60 mt-1">Carried from prior period</div>
-          </div>
+    <section aria-label="Results" className="space-y-3">
+      {/* ── The answer ──────────────────────────────── */}
+      <div className="card text-center sm:py-12">
+        <h2 className="text-[17px] text-sub">Estimated final balance</h2>
+        <p className="tabular mt-1 text-[40px] font-semibold leading-[1.1] tracking-[-0.02em] text-ink min-[400px]:text-[46px] sm:text-[64px]">
+          {formatRM(finalBalance)}
+        </p>
+        <p className="mx-auto mt-3 max-w-md text-[17px] leading-snug text-sub">
+          Includes{" "}
+          <span className="tabular font-semibold text-gain">{formatRM(totalDividend)}</span> in dividends
+          at {dividendRate.toFixed(2)}% a year.
+        </p>
+        {pendingDividend > 0.005 && (
+          <p className="mx-auto mt-2 max-w-md text-[13px] leading-snug text-sub">
+            <span className="tabular">{formatRM(pendingDividend)}</span> of that is earned but not yet credited.
+            ASNB credits it after the fund&rsquo;s year ends in {fyEndName}.
+          </p>
         )}
-
-        {/* New deposits — only shown if any */}
-        {hasDeposits && (
-          <div className="stat-card">
-            <div className="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1 flex items-center gap-1">
-              <ArrowDownCircle size={12} /> New Deposits
-            </div>
-            <div className="text-xl font-bold">{formatRM(totalDeposited)}</div>
-            <div className="text-xs opacity-60 mt-1">
-              {transactions.filter((t) => t.type === "deposit").length} transaction{transactions.filter((t) => t.type === "deposit").length !== 1 ? "s" : ""}
-            </div>
-          </div>
-        )}
-
-        {/* Withdrawals — only shown if any */}
-        {hasWithdrawals && (
-          <div className="bg-gradient-to-br from-red-500 to-red-700 text-white rounded-2xl p-5 shadow-md">
-            <div className="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1 flex items-center gap-1">
-              <ArrowUpCircle size={12} /> Withdrawn
-            </div>
-            <div className="text-xl font-bold">{formatRM(totalWithdrawn)}</div>
-            <div className="text-xs opacity-60 mt-1">
-              {transactions.filter((t) => t.type === "withdrawal").length} transaction{transactions.filter((t) => t.type === "withdrawal").length !== 1 ? "s" : ""}
-            </div>
-          </div>
-        )}
-
-        {/* Dividend earned — always shown */}
-        <div className="stat-card-gold">
-          <div className="text-xs font-semibold uppercase tracking-wide opacity-70 mb-1">Dividend Earned</div>
-          <div className="text-xl font-bold">{formatRM(totalDividend)}</div>
-          <div className="text-xs opacity-60 mt-1">{dividendRate.toFixed(2)}% p.a.</div>
-        </div>
-
-        {/* Final balance — always shown */}
-        <div className="bg-white rounded-2xl p-5 border border-green-100 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Final Balance</div>
-          <div className="text-xl font-bold text-[#006747]">{formatRM(finalBalance)}</div>
-          <div className="text-xs text-gray-400 mt-1">{formatUnits(totalUnits)} units</div>
-        </div>
-
-        {/* Effective yield — always shown */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Effective Yield</div>
-          <div className="text-xl font-bold text-[#C8A951]">{effectiveRate.toFixed(2)}%</div>
-          <div className="text-xs text-gray-400 mt-1">on total capital</div>
-        </div>
       </div>
 
-      {/* ── Detailed panel ───────────────────────────── */}
+      {/* ── Supporting figures ──────────────────────── */}
+      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {hasInitial && (
+          <Stat label="Opening balance" value={formatRM(initialBalance)} note="Carried from before" />
+        )}
+        {hasDeposits && (
+          <Stat
+            label="New deposits"
+            value={formatRM(totalDeposited)}
+            note={`${depositCount} transaction${depositCount !== 1 ? "s" : ""}`}
+          />
+        )}
+        {hasWithdrawals && (
+          <Stat
+            label="Withdrawn"
+            value={`−${formatRM(totalWithdrawn)}`}
+            tone="loss"
+            note={`${withdrawalCount} transaction${withdrawalCount !== 1 ? "s" : ""}`}
+          />
+        )}
+        <Stat label="Dividend earned" value={formatRM(totalDividend)} tone="gain" note={`${dividendRate.toFixed(2)}% a year`} />
+        <Stat label="Effective yield" value={`${effectiveRate.toFixed(2)}%`} note="On total capital" />
+        <Stat label="Units held" value={formatUnits(totalUnits)} note="At RM 1.00 each" />
+      </dl>
+
+      {/* ── Detail ──────────────────────────────────── */}
       <div className="card">
-        {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
-                tab === t.id ? "bg-white text-[#006747] shadow-sm" : "text-gray-500 hover:text-[#006747]"
-              }`}
-            >
-              {t.icon}{t.label}
-            </button>
-          ))}
+        <div className="mx-auto mb-6 sm:max-w-sm">
+          <Segmented label="Result view" options={TABS} value={tab} onChange={setTab} />
         </div>
 
         {/* ── Overview ── */}
         {tab === "overview" && (
-          <div className="space-y-5">
-            <div className="grid sm:grid-cols-2 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-gray-50">
-              <div className="space-y-0 sm:pr-6">
+          <div className="space-y-8">
+            <dl className="grid gap-x-10 sm:grid-cols-2">
+              <div>
                 <InfoRow label="Fund" value={fundName} />
-                <InfoRow label="Dividend Rate" value={`${dividendRate.toFixed(2)}% per annum`} />
-                <InfoRow label="Period" value={`${formatDate(result.startDate)} → ${formatDate(result.endDate)}`} />
-                <InfoRow label="Final Units" value={formatUnits(totalUnits)} />
+                <InfoRow label="Dividend rate" value={`${dividendRate.toFixed(2)}% a year`} />
+                <InfoRow label="Period" value={`${formatDate(result.startDate)} to ${formatDate(result.endDate)}`} />
               </div>
-              <div className="space-y-0 sm:pl-6 pt-4 sm:pt-0">
-                {hasInitial && <InfoRow label="Opening Balance" value={formatRM(initialBalance)} highlight="amber" />}
-                {hasDeposits && <InfoRow label="Total Deposited" value={formatRM(totalDeposited)} highlight="green" />}
-                {hasWithdrawals && <InfoRow label="Total Withdrawn" value={`−${formatRM(totalWithdrawn)}`} highlight="red" />}
-                <InfoRow label="Dividend Earned" value={formatRM(totalDividend)} highlight="gold" />
-                <InfoRow label="Final Balance" value={formatRM(finalBalance)} highlight="green" />
+              <div>
+                {hasInitial && <InfoRow label="Opening balance" value={formatRM(initialBalance)} />}
+                {hasDeposits && <InfoRow label="Total deposited" value={formatRM(totalDeposited)} />}
+                {hasWithdrawals && <InfoRow label="Total withdrawn" value={`−${formatRM(totalWithdrawn)}`} tone="loss" />}
+                <InfoRow label="Dividend earned" value={formatRM(totalDividend)} tone="gain" />
+                <InfoRow label="Final balance" value={formatRM(finalBalance)} strong />
+              </div>
+            </dl>
+
+            {/* Balance composition */}
+            <div>
+              <h3 className="mb-3 text-[17px] font-semibold text-ink">What the balance is made of</h3>
+              <div className="flex h-3 gap-0.5 overflow-hidden rounded-full" role="img"
+                aria-label={`Net capital ${capPct.toFixed(1)} percent, dividend ${divPct.toFixed(1)} percent`}>
+                <div className="rounded-l-full transition-all" style={{ width: `${capPct}%`, background: C_BALANCE }} />
+                <div className="min-w-[6px] flex-1 rounded-r-full transition-all" style={{ background: C_DIVIDEND }} />
+              </div>
+              <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[15px] text-sub">
+                <span className="flex items-center gap-2">
+                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: C_BALANCE }} />
+                  Net capital <span className="tabular text-ink">{formatRM(netCapital)}</span> ({capPct.toFixed(1)}%)
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: C_DIVIDEND }} />
+                  Dividend <span className="tabular text-ink">{formatRM(totalDividend)}</span> ({divPct.toFixed(1)}%)
+                </span>
               </div>
             </div>
 
             {/* Transaction history */}
             {transactions.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Transaction History</h3>
-                <div className="bg-gray-50 rounded-xl overflow-hidden border border-gray-100">
-                  <div className="grid grid-cols-4 text-xs font-semibold text-gray-400 uppercase px-4 py-2.5 border-b border-gray-100">
-                    <span>#</span><span>Type</span><span>Date</span><span className="text-right">Amount</span>
-                  </div>
-                  <div className="max-h-52 overflow-y-auto">
-                    {transactions.map((tx, i) => {
-                      const isW = tx.type === "withdrawal";
-                      return (
-                        <div key={i} className={`grid grid-cols-4 text-sm px-4 py-2.5 items-center ${i % 2 === 0 ? "bg-white" : "bg-gray-50"}`}>
-                          <span className="text-gray-400 text-xs font-medium">{i + 1}</span>
-                          <span>
-                            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
-                              isW ? "bg-red-100 text-red-600" : "bg-[#E8F5EE] text-[#006747]"
-                            }`}>
-                              {isW ? <ArrowUpCircle size={10} /> : <ArrowDownCircle size={10} />}
-                              {isW ? "Withdraw" : "Deposit"}
-                            </span>
-                          </span>
-                          <span className="font-medium text-gray-700">{formatDate(tx.date)}</span>
-                          <span className={`text-right font-semibold ${isW ? "text-red-600" : "text-[#006747]"}`}>
-                            {isW ? "−" : "+"}{formatRM(tx.amount)}
-                          </span>
+                <h3 className="mb-3 text-[17px] font-semibold text-ink">Transactions</h3>
+                <ol className="max-h-72 divide-y divide-black/[0.06] overflow-y-auto rounded-2xl bg-fog px-4">
+                  {transactions.map((tx, i) => {
+                    const isW = tx.type === "withdrawal";
+                    return (
+                      <li key={i} className="flex items-center justify-between gap-4 py-3">
+                        <div className="min-w-0">
+                          <div className="text-[15px] font-medium text-ink">{isW ? "Withdrawal" : "Deposit"}</div>
+                          <div className="tabular text-[13px] text-sub">{formatDate(tx.date)}</div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                        <span className={`tabular text-[15px] font-semibold ${isW ? "text-loss" : "text-gain"}`}>
+                          {isW ? "−" : "+"}{formatRM(tx.amount)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ol>
               </div>
             )}
-
-            {/* Balance composition bar */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Balance Composition</h3>
-              <div className="bg-gray-50 rounded-xl p-4">
-                {(() => {
-                  const totalCapital = initialBalance + totalDeposited - totalWithdrawn;
-                  const total = totalCapital + totalDividend;
-                  const capPct = total > 0 ? (totalCapital / total) * 100 : 0;
-                  const initPct = total > 0 ? (initialBalance / total) * 100 : 0;
-                  const depPct = total > 0 ? (totalDeposited / total) * 100 : 0;
-                  const withPct = total > 0 ? (totalWithdrawn / total) * 100 : 0;
-                  const divPct = total > 0 ? (totalDividend / total) * 100 : 0;
-                  return (
-                    <>
-                      <div className="flex justify-between text-xs text-gray-500 mb-2">
-                        <span>Net Capital ({capPct.toFixed(1)}%)</span>
-                        <span>Dividend ({divPct.toFixed(1)}%)</span>
-                      </div>
-                      <div className="h-5 rounded-full overflow-hidden flex gap-px">
-                        {hasInitial && (
-                          <div className="bg-amber-400 transition-all" style={{ width: `${initPct}%` }} title={`Opening: ${formatRM(initialBalance)}`} />
-                        )}
-                        {hasDeposits && (
-                          <div className="bg-[#006747] transition-all" style={{ width: `${depPct}%` }} title={`Deposited: ${formatRM(totalDeposited)}`} />
-                        )}
-                        {hasWithdrawals && (
-                          <div className="bg-red-300 transition-all opacity-60" style={{ width: `${withPct}%` }} title={`Withdrawn: ${formatRM(totalWithdrawn)}`} />
-                        )}
-                        <div className="bg-[#C8A951] transition-all flex-1" title={`Dividend: ${formatRM(totalDividend)}`} />
-                      </div>
-                      <div className="flex flex-wrap gap-3 mt-3">
-                        {hasInitial && (
-                          <span className="flex items-center gap-1 text-xs text-gray-600">
-                            <span className="w-3 h-3 rounded-sm bg-amber-400 inline-block" /> Opening {formatRM(initialBalance)}
-                          </span>
-                        )}
-                        {hasDeposits && (
-                          <span className="flex items-center gap-1 text-xs text-gray-600">
-                            <span className="w-3 h-3 rounded-sm bg-[#006747] inline-block" /> Deposited {formatRM(totalDeposited)}
-                          </span>
-                        )}
-                        {hasWithdrawals && (
-                          <span className="flex items-center gap-1 text-xs text-gray-600">
-                            <span className="w-3 h-3 rounded-sm bg-red-300 inline-block" /> Withdrawn {formatRM(totalWithdrawn)}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1 text-xs text-gray-600">
-                          <span className="w-3 h-3 rounded-sm bg-[#C8A951] inline-block" /> Dividend {formatRM(totalDividend)}
-                        </span>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
           </div>
         )}
 
-        {/* ── Monthly Breakdown ── */}
+        {/* ── Monthly breakdown ── */}
         {tab === "monthly" && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide pb-3 pr-3">Month</th>
-                  <th className="text-right text-xs font-semibold text-[#006747] uppercase tracking-wide pb-3 pr-3">Deposited</th>
-                  {hasWithdrawals && (
-                    <th className="text-right text-xs font-semibold text-red-400 uppercase tracking-wide pb-3 pr-3">Withdrawn</th>
-                  )}
-                  <th className="text-right text-xs font-semibold text-[#C8A951] uppercase tracking-wide pb-3 pr-3">Dividend</th>
-                  <th className="text-right text-xs font-semibold text-gray-400 uppercase tracking-wide pb-3 pr-3">Units</th>
-                  <th className="text-right text-xs font-semibold text-gray-400 uppercase tracking-wide pb-3">Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {months.map((m, i) => (
-                  <tr key={i} className={`border-b border-gray-50 ${i % 2 !== 0 ? "bg-gray-50/50" : ""}`}>
-                    <td className="py-2.5 pr-3 font-medium text-gray-700">{m.month}</td>
-                    <td className="py-2.5 pr-3 text-right">
-                      {m.deposited > 0
-                        ? <span className="text-[#006747] font-semibold">{formatRM(m.deposited)}</span>
-                        : <span className="text-gray-300">—</span>}
-                    </td>
-                    {hasWithdrawals && (
-                      <td className="py-2.5 pr-3 text-right">
-                        {m.withdrawn > 0
-                          ? <span className="text-red-500 font-semibold">−{formatRM(m.withdrawn)}</span>
-                          : <span className="text-gray-300">—</span>}
-                      </td>
-                    )}
-                    <td className="py-2.5 pr-3 text-right text-[#C8A951] font-semibold">{formatRM(m.dividendEarned)}</td>
-                    <td className="py-2.5 pr-3 text-right text-gray-500 text-xs">{formatUnits(m.endingUnits)}</td>
-                    <td className="py-2.5 text-right font-bold text-[#006747]">{formatRM(m.endingBalance)}</td>
+          <div>
+            {/* Phones: one block per month. Every figure sits on its own line,
+                label on the left and amount on the right, so the numbers form
+                one aligned column however many lines a month has. */}
+            <ol className="space-y-2 sm:hidden">
+              {months.map((m, i) => (
+                <li key={i} className="rounded-2xl bg-fog px-3 py-3 min-[360px]:px-4">
+                  <h4 className="text-[17px] font-semibold text-ink">{m.month}</h4>
+                  <dl className="mt-1.5">
+                    <MonthLine label="Lowest balance" value={formatRM(m.minBalance)} />
+                    {m.deposited > 0 && <MonthLine label="Deposited" value={`+${formatRM(m.deposited)}`} />}
+                    {m.withdrawn > 0 && <MonthLine label="Withdrawn" value={`−${formatRM(m.withdrawn)}`} tone="loss" />}
+                    {m.counted
+                      ? <MonthLine label="Dividend" value={`+${formatRM(m.dividendEarned)}`} tone="gain" />
+                      : <MonthLine label="Dividend" value="Not counted" muted />}
+                    <MonthLine label="Closing balance" value={formatRM(m.endingBalance)} strong />
+                  </dl>
+                </li>
+              ))}
+              <li className="rounded-2xl bg-ink px-3 py-3 text-white min-[360px]:px-4">
+                <h4 className="text-[17px] font-semibold">Total</h4>
+                <dl className="mt-1.5">
+                  <MonthLine label="Deposited" value={formatRM(totalDeposited)} onDark />
+                  {hasWithdrawals && <MonthLine label="Withdrawn" value={`−${formatRM(totalWithdrawn)}`} onDark />}
+                  <MonthLine label="Dividend" value={formatRM(totalDividend)} onDark />
+                  <MonthLine label="Final balance" value={formatRM(finalBalance)} strong onDark />
+                </dl>
+              </li>
+            </ol>
+
+            {/* Tablets and up: full table */}
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="tabular w-full text-[15px]">
+                <thead>
+                  <tr className="border-b border-hairline text-[13px] text-sub">
+                    <th scope="col" className="pb-3 pr-3 text-left font-medium">Month</th>
+                    <th scope="col" className="pb-3 pr-3 text-right font-medium">Deposited</th>
+                    {hasWithdrawals && <th scope="col" className="pb-3 pr-3 text-right font-medium">Withdrawn</th>}
+                    <th scope="col" className="pb-3 pr-3 text-right font-medium">Lowest balance</th>
+                    <th scope="col" className="pb-3 pr-3 text-right font-medium">Dividend</th>
+                    <th scope="col" className="pb-3 text-right font-medium">Balance</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-[#006747]/20 bg-[#E8F5EE]">
-                  <td className="py-3 pr-3 font-bold text-[#006747] text-xs uppercase tracking-wide">Total</td>
-                  <td className="py-3 pr-3 text-right font-bold text-[#006747]">{formatRM(totalDeposited)}</td>
-                  {hasWithdrawals && (
-                    <td className="py-3 pr-3 text-right font-bold text-red-600">−{formatRM(totalWithdrawn)}</td>
-                  )}
-                  <td className="py-3 pr-3 text-right font-bold text-[#C8A951]">{formatRM(totalDividend)}</td>
-                  <td className="py-3 pr-3 text-right font-bold text-[#006747] text-xs">{formatUnits(totalUnits)}</td>
-                  <td className="py-3 text-right font-bold text-[#006747]">{formatRM(finalBalance)}</td>
-                </tr>
-              </tfoot>
-            </table>
-            {hasInitial && (
-              <p className="text-xs text-amber-600 mt-3 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
-                ℹ️ Opening balance of {formatRM(initialBalance)} is included in the starting unit count but not shown as a monthly deposit.
-              </p>
-            )}
+                </thead>
+                <tbody>
+                  {months.map((m, i) => (
+                    <tr key={i} className="border-b border-black/[0.06]">
+                      <td className="py-3 pr-3 font-medium text-ink">{m.month}</td>
+                      <td className="py-3 pr-3 text-right text-ink">
+                        {m.deposited > 0 ? formatRM(m.deposited) : <span className="text-hairline">–</span>}
+                      </td>
+                      {hasWithdrawals && (
+                        <td className="py-3 pr-3 text-right text-loss">
+                          {m.withdrawn > 0 ? `−${formatRM(m.withdrawn)}` : <span className="text-hairline">–</span>}
+                        </td>
+                      )}
+                      <td className="py-3 pr-3 text-right text-sub">{formatRM(m.minBalance)}</td>
+                      <td className="py-3 pr-3 text-right text-gain">
+                        {m.counted ? formatRM(m.dividendEarned) : <span className="text-hairline">–</span>}
+                      </td>
+                      <td className="py-3 text-right font-semibold text-ink">{formatRM(m.endingBalance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="font-semibold text-ink">
+                    <td className="pt-4 pr-3">Total</td>
+                    <td className="pt-4 pr-3 text-right">{formatRM(totalDeposited)}</td>
+                    {hasWithdrawals && <td className="pt-4 pr-3 text-right text-loss">−{formatRM(totalWithdrawn)}</td>}
+                    <td className="pt-4 pr-3" />
+                    <td className="pt-4 pr-3 text-right text-gain">{formatRM(totalDividend)}</td>
+                    <td className="pt-4 text-right">{formatRM(finalBalance)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <p className="mt-4 rounded-xl bg-fog px-4 py-3 text-[13px] leading-snug text-sub">
+              Each month&rsquo;s dividend is its lowest balance &times; {dividendRate.toFixed(2)}% &divide; 12.
+              {" "}Balances show the dividend once it is credited after {fyEndName}.
+              {hasUncounted && " A month that ends after your calculate-until date is not counted."}
+              {hasInitial && ` The opening balance of ${formatRM(initialBalance)} is held from the start of the financial year and is not shown as a deposit.`}
+            </p>
           </div>
         )}
 
         {/* ── Charts ── */}
         {tab === "chart" && (
-          <div className="space-y-8">
+          <div className="space-y-10">
             <div>
-              <h3 className="text-sm font-semibold text-gray-600 mb-4">Portfolio Value Over Time</h3>
-              <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={cumulativeData}>
-                  <defs>
-                    <linearGradient id="valueGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#006747" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="#006747" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="divGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#C8A951" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#C8A951" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9ca3af" }} interval="preserveStartEnd" />
-                  <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickFormatter={(v) => `RM${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(value: number) => formatRM(value)} contentStyle={{ borderRadius: "12px", border: "1px solid #e5e7eb", fontSize: "12px" }} />
-                  <Legend wrapperStyle={{ fontSize: "12px" }} />
-                  <Area type="monotone" dataKey="Portfolio Value" stroke="#006747" fill="url(#valueGrad)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="Dividend Earned" stroke="#C8A951" fill="url(#divGrad)" strokeWidth={2} />
-                  {hasWithdrawals && (
-                    <Area type="monotone" dataKey="Withdrawn" stroke="#ef4444" fill="none" strokeWidth={1.5} strokeDasharray="4 2" />
-                  )}
-                </AreaChart>
-              </ResponsiveContainer>
+              <h3 className="mb-4 text-[17px] font-semibold text-ink">Portfolio value over time</h3>
+              <div className="-ml-2 h-[240px] sm:h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={cumulativeData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                    <defs>
+                      <linearGradient id="valueGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={C_BALANCE} stopOpacity={0.18} />
+                        <stop offset="95%" stopColor={C_BALANCE} stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="divGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={C_DIVIDEND} stopOpacity={0.2} />
+                        <stop offset="95%" stopColor={C_DIVIDEND} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid vertical={false} stroke="#e8e8ed" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#6e6e73" }} tickLine={false} axisLine={{ stroke: "#d2d2d7" }} interval="preserveStartEnd" minTickGap={24} />
+                    <YAxis width={44} tick={{ fontSize: 11, fill: "#6e6e73" }} tickLine={false} axisLine={false} tickFormatter={compactRM} />
+                    <Tooltip formatter={(value: number) => formatRM(value)} contentStyle={tooltipStyle} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "13px", paddingTop: 8 }} />
+                    <Area type="monotone" dataKey="Portfolio value" stroke={C_BALANCE} fill="url(#valueGrad)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="Dividend earned" stroke={C_DIVIDEND} fill="url(#divGrad)" strokeWidth={2} />
+                    {hasWithdrawals && (
+                      <Area type="monotone" dataKey="Withdrawn" stroke={C_WITHDRAWN} fill="none" strokeWidth={1.5} strokeDasharray="4 2" />
+                    )}
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
             <div>
-              <h3 className="text-sm font-semibold text-gray-600 mb-4">Monthly Activity</h3>
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={barData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9ca3af" }} interval="preserveStartEnd" />
-                  <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickFormatter={(v) => `RM${v.toFixed(0)}`} />
-                  <Tooltip formatter={(value: number) => formatRM(value)} contentStyle={{ borderRadius: "12px", border: "1px solid #e5e7eb", fontSize: "12px" }} />
-                  <Legend wrapperStyle={{ fontSize: "12px" }} />
-                  <Bar dataKey="Deposited" fill="#006747" radius={[4, 4, 0, 0]} opacity={0.85} />
-                  {hasWithdrawals && <Bar dataKey="Withdrawn" fill="#ef4444" radius={[4, 4, 0, 0]} opacity={0.75} />}
-                  <Bar dataKey="Dividend" fill="#C8A951" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <h3 className="mb-4 text-[17px] font-semibold text-ink">Monthly activity</h3>
+              <div className="-ml-2 h-[220px] sm:h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={barData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                    <CartesianGrid vertical={false} stroke="#e8e8ed" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#6e6e73" }} tickLine={false} axisLine={{ stroke: "#d2d2d7" }} interval="preserveStartEnd" minTickGap={24} />
+                    <YAxis width={44} tick={{ fontSize: 11, fill: "#6e6e73" }} tickLine={false} axisLine={false} tickFormatter={compactRM} />
+                    <Tooltip formatter={(value: number) => formatRM(value)} contentStyle={tooltipStyle} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "13px", paddingTop: 8 }} />
+                    <Bar dataKey="Deposited" fill={C_BALANCE} radius={[4, 4, 0, 0]} />
+                    {hasWithdrawals && <Bar dataKey="Withdrawn" fill={C_WITHDRAWN} radius={[4, 4, 0, 0]} />}
+                    <Bar dataKey="Dividend" fill={C_DIVIDEND} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="mt-2 text-[13px] text-sub">Amounts in RM.</p>
             </div>
           </div>
         )}
@@ -356,19 +342,56 @@ export default function ResultsPanel({ result }: Props) {
   );
 }
 
-function InfoRow({ label, value, highlight }: { label: string; value: string; highlight?: "green" | "red" | "gold" | "amber" }) {
-  const colors: Record<string, string> = {
-    green: "text-[#006747]",
-    red: "text-red-600",
-    gold: "text-[#C8A951]",
-    amber: "text-amber-600",
-  };
+function Stat({ label, value, note, tone }: { label: string; value: string; note?: string; tone?: "gain" | "loss" }) {
   return (
-    <div className="flex justify-between items-start py-3 border-b border-gray-50">
-      <span className="text-sm text-gray-400">{label}</span>
-      <span className={`text-sm font-semibold text-right ml-4 ${highlight ? colors[highlight] : "text-gray-700"}`}>
+    <div className="rounded-[18px] bg-white p-4 sm:p-5">
+      <dt className="text-[13px] text-sub">{label}</dt>
+      <dd
+        className={`tabular mt-1 text-[19px] font-semibold tracking-tight min-[400px]:text-[21px] sm:text-2xl ${
+          tone === "gain" ? "text-gain" : tone === "loss" ? "text-loss" : "text-ink"
+        }`}
+      >
         {value}
-      </span>
+      </dd>
+      {note && <dd className="mt-0.5 text-[13px] text-sub">{note}</dd>}
+    </div>
+  );
+}
+
+function MonthLine({
+  label, value, tone, strong, muted, onDark,
+}: { label: string; value: string; tone?: "gain" | "loss"; strong?: boolean; muted?: boolean; onDark?: boolean }) {
+  const labelColor = onDark ? "text-white/70" : "text-sub";
+  const valueColor = onDark
+    ? "text-white"
+    : muted ? "text-sub" : tone === "gain" ? "text-gain" : tone === "loss" ? "text-loss" : "text-ink";
+  return (
+    <div
+      className={`flex items-baseline justify-between gap-3 py-1 text-sm min-[360px]:text-[15px] ${
+        strong ? `mt-1 border-t pt-2 ${onDark ? "border-white/20" : "border-black/[0.08]"}` : ""
+      }`}
+    >
+      <dt className={`whitespace-nowrap ${strong ? (onDark ? "font-semibold text-white" : "font-semibold text-ink") : labelColor}`}>
+        {label}
+      </dt>
+      <dd className={`whitespace-nowrap text-right ${muted ? "" : "tabular"} ${strong ? "font-semibold" : "font-medium"} ${valueColor}`}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function InfoRow({ label, value, tone, strong }: { label: string; value: string; tone?: "gain" | "loss"; strong?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b border-black/[0.06] py-3">
+      <dt className="shrink-0 text-[15px] text-sub">{label}</dt>
+      <dd
+        className={`tabular text-right text-[15px] ${strong ? "font-semibold" : "font-medium"} ${
+          tone === "gain" ? "text-gain" : tone === "loss" ? "text-loss" : "text-ink"
+        }`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

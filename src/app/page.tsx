@@ -16,11 +16,12 @@ import LumpsumForm from "@/components/LumpsumForm";
 import MonthlyForm from "@/components/MonthlyForm";
 import PeriodicForm from "@/components/PeriodicForm";
 import ResultsPanel from "@/components/ResultsPanel";
+import { Segmented } from "@/components/ui";
 
-const MODES: { id: InvestmentMode; label: string; icon: string; desc: string }[] = [
-  { id: "lumpsum", label: "Lump Sum", icon: "💰", desc: "One-time deposit" },
-  { id: "monthly", label: "Monthly", icon: "📅", desc: "Same amount every month" },
-  { id: "periodic", label: "Periodic", icon: "✏️", desc: "Custom dates & amounts" },
+const MODES: { id: InvestmentMode; label: string; desc: string }[] = [
+  { id: "lumpsum", label: "Lump sum", desc: "One deposit, left to grow until the date you choose." },
+  { id: "monthly", label: "Monthly", desc: "The same amount deposited every month." },
+  { id: "periodic", label: "Custom", desc: "Your own mix of deposits and withdrawals on any dates." },
 ];
 
 export default function Home() {
@@ -61,161 +62,151 @@ export default function Home() {
     }
   }
 
+  const activeMode = MODES.find((m) => m.id === mode)!;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f0f7f4] via-white to-[#f5f5f0]">
-      {/* Header */}
-      <header className="bg-white border-b border-green-100 shadow-sm sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-[#006747] flex items-center justify-center text-white font-bold text-lg shrink-0">
-            A
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-[#006747] font-display leading-tight">
-              ASNB Dividend Calculator
-            </h1>
-            <p className="text-xs text-gray-400 font-medium">
-              Estimate your returns from ASNB fixed-price funds
-            </p>
-          </div>
-          <div className="ml-auto hidden sm:block">
-            <span className="text-xs bg-[#E8F5EE] text-[#006747] font-semibold px-3 py-1.5 rounded-full">
-              For estimation only
-            </span>
-          </div>
+    <div className="min-h-screen bg-fog">
+      {/* Global bar */}
+      <header className="sticky top-0 z-20 border-b border-black/[0.08] bg-[rgba(250,250,252,0.8)] backdrop-blur-xl backdrop-saturate-[1.8]">
+        <div className="mx-auto flex h-12 max-w-[980px] items-center justify-between gap-4 px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
+          <span className="text-[17px] font-semibold tracking-tight text-ink">ASNB Calculator</span>
+          <span className="text-xs text-sub">Estimates only</span>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-        {/* Fund Selector */}
-        <section className="card">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Select Fund</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {ASNB_FUNDS.map((fund) => (
-              <button
-                key={fund.id}
-                onClick={() => setSelectedFundId(fund.id)}
-                className={`p-3 rounded-xl border-2 text-left transition-all ${
-                  selectedFundId === fund.id
-                    ? "border-[#006747] bg-[#E8F5EE]"
-                    : "border-gray-100 hover:border-[#006747]/30 bg-white"
-                }`}
-              >
-                <div className="font-bold text-[#006747] text-sm">{fund.shortName}</div>
-                {fund.id !== "custom" ? (
-                  <div className="text-xs text-gray-500 mt-0.5">{(fund.dividendRate * 100).toFixed(2)}% p.a.</div>
-                ) : (
-                  <div className="text-xs text-gray-400 mt-0.5">Set your own rate</div>
-                )}
-              </button>
-            ))}
-          </div>
+      <main className="mx-auto max-w-[980px] px-4 pb-10 sm:px-6">
+        {/* Hero */}
+        <div className="mx-auto max-w-[720px] px-2 pb-8 pt-10 text-center sm:pb-12 sm:pt-16">
+          <h1 className="text-[40px] font-semibold leading-[1.07] tracking-[-0.022em] text-ink sm:text-[56px] lg:text-[64px]">
+            ASNB dividend calculator
+          </h1>
+          <p className="mx-auto mt-4 max-w-[30em] text-[19px] leading-[1.35] text-sub sm:text-[21px]">
+            See what your ASB, ASB 2 or ASM savings could earn, using ASNB’s minimum monthly balance method.
+          </p>
+        </div>
 
-          {isCustom && (
-            <div className="mt-4 max-w-xs">
-              <label className="label">Custom Dividend Rate (% per annum)</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="20"
-                  className="input-field pr-10"
-                  placeholder="e.g. 5.25"
-                  value={customRate}
-                  onChange={(e) => setCustomRate(e.target.value)}
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">%</span>
+        <div className="mx-auto max-w-[720px] space-y-3">
+          {/* Fund */}
+          <section className="card" aria-labelledby="fund-heading">
+            <h2 id="fund-heading" className="card-title">Choose a fund</h2>
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {ASNB_FUNDS.map((fund) => {
+                const active = selectedFundId === fund.id;
+                return (
+                  <button
+                    key={fund.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setSelectedFundId(fund.id)}
+                    className={`min-h-[76px] rounded-2xl px-4 py-3 text-left transition-shadow ${
+                      active
+                        ? "shadow-[inset_0_0_0_2px_#0071e3]"
+                        : "shadow-[inset_0_0_0_1px_#d2d2d7] hover:shadow-[inset_0_0_0_1px_#86868b]"
+                    }`}
+                  >
+                    <div className="text-[17px] font-semibold text-ink">{fund.shortName}</div>
+                    <div className="tabular mt-0.5 text-sm text-sub">
+                      {fund.id !== "custom" ? `${(fund.dividendRate * 100).toFixed(2)}% a year` : "Your own rate"}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {isCustom ? (
+              <div className="mt-5 sm:max-w-[calc(50%-0.375rem)]">
+                <label htmlFor="custom-rate" className="label">Dividend rate per year</label>
+                <div className="relative">
+                  <input
+                    id="custom-rate"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    max="20"
+                    className="input-field tabular pr-10"
+                    placeholder="5.25"
+                    value={customRate}
+                    onChange={(e) => setCustomRate(e.target.value)}
+                  />
+                  <span aria-hidden className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[17px] text-sub">%</span>
+                </div>
               </div>
+            ) : (
+              <p className="hint mt-4">
+                Rates are the latest declared: ASB for 2025, ASB 2 and ASM for the year to 31 March 2026. Future rates may differ.
+              </p>
+            )}
+          </section>
+
+          {/* Strategy + details */}
+          <section className="card" aria-labelledby="plan-heading">
+            <h2 id="plan-heading" className="card-title">How will you invest?</h2>
+            <div className="mt-5">
+              <Segmented
+                label="Investment strategy"
+                options={MODES}
+                value={mode}
+                onChange={(id) => { setMode(id); setResult(null); setError(""); }}
+              />
+              <p className="mt-3 text-center text-[15px] text-sub">{activeMode.desc}</p>
             </div>
-          )}
 
-          {!isCustom && (
-            <p className="mt-3 text-xs text-gray-400">
-              * Dividend rate shown is indicative based on recent declarations. Actual rates may vary.
-            </p>
-          )}
-        </section>
+            <hr className="my-6 border-black/[0.08]" />
 
-        {/* Mode Selector */}
-        <section className="card">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Investment Strategy</h2>
-          <div className="grid grid-cols-3 gap-3">
-            {MODES.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => { setMode(m.id); setResult(null); setError(""); }}
-                className={`p-4 rounded-xl border-2 text-center transition-all ${
-                  mode === m.id
-                    ? "border-[#006747] bg-[#E8F5EE]"
-                    : "border-gray-100 hover:border-[#006747]/30 bg-white"
-                }`}
-              >
-                <div className="text-2xl mb-1">{m.icon}</div>
-                <div className="font-bold text-sm text-[#006747]">{m.label}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{m.desc}</div>
-              </button>
-            ))}
-          </div>
-        </section>
+            {error && (
+              <div role="alert" className="mb-5 rounded-xl bg-[#fff1f1] px-4 py-3 text-[15px] text-loss">
+                {error}
+              </div>
+            )}
 
-        {/* Input Form */}
-        <section className="card">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-5">
-            {MODES.find((m) => m.id === mode)?.label} Details
-          </h2>
+            {mode === "lumpsum" && (
+              <LumpsumForm
+                fund={selectedFund}
+                onCalculate={(amount, date, withdrawals, endDate, initialBalance) => {
+                  const deposits = amount > 0 ? buildLumpsumTransactions(amount, date) : [];
+                  handleCalculate([...deposits, ...withdrawals], endDate, initialBalance);
+                }}
+              />
+            )}
 
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
-              {error}
-            </div>
-          )}
+            {mode === "monthly" && (
+              <MonthlyForm
+                fund={selectedFund}
+                onCalculate={(amount, startDate, months, dayOfMonth, withdrawals, initialBalance) => {
+                  const deposits = amount > 0
+                    ? buildMonthlyTransactions(amount, startDate, months, dayOfMonth)
+                    : [];
+                  handleCalculate([...deposits, ...withdrawals], undefined, initialBalance);
+                }}
+              />
+            )}
 
-          {mode === "lumpsum" && (
-            <LumpsumForm
-              fund={selectedFund}
-              onCalculate={(amount, date, withdrawals, endDate, initialBalance) => {
-                const deposits = amount > 0 ? buildLumpsumTransactions(amount, date) : [];
-                handleCalculate([...deposits, ...withdrawals], endDate, initialBalance);
-              }}
-            />
-          )}
-
-          {mode === "monthly" && (
-            <MonthlyForm
-              fund={selectedFund}
-              onCalculate={(amount, startDate, months, dayOfMonth, withdrawals, initialBalance) => {
-                const deposits = amount > 0
-                  ? buildMonthlyTransactions(amount, startDate, months, dayOfMonth)
-                  : [];
-                handleCalculate([...deposits, ...withdrawals], undefined, initialBalance);
-              }}
-            />
-          )}
-
-          {mode === "periodic" && (
-            <PeriodicForm
-              fund={selectedFund}
-              onCalculate={(transactions, endDate, initialBalance) =>
-                handleCalculate(buildPeriodicTransactions(transactions), endDate, initialBalance)
-              }
-            />
-          )}
-        </section>
+            {mode === "periodic" && (
+              <PeriodicForm
+                fund={selectedFund}
+                onCalculate={(transactions, endDate, initialBalance) =>
+                  handleCalculate(buildPeriodicTransactions(transactions), endDate, initialBalance)
+                }
+              />
+            )}
+          </section>
+        </div>
 
         {/* Results */}
-        <div id="results">
+        <div id="results" className="mt-3 scroll-mt-16">
           {result && <ResultsPanel result={result} />}
         </div>
 
         {/* Disclaimer */}
-        <footer className="text-center text-xs text-gray-400 pb-8 max-w-2xl mx-auto">
-          This calculator is for <strong>estimation purposes only</strong>. Dividend rates are
-          not guaranteed and are declared annually by ASNB. The actual dividend credited may differ.
-          Please refer to{" "}
-          <a href="https://www.asnb.com.my" target="_blank" rel="noopener noreferrer" className="text-[#006747] underline">
-            www.asnb.com.my
-          </a>{" "}
-          for official information.
+        <footer className="mx-auto mt-10 max-w-[720px] border-t border-hairline px-2 pt-5 text-xs leading-relaxed text-sub pb-[env(safe-area-inset-bottom)]">
+          This calculator is for estimation only. Dividend rates are not guaranteed and are
+          declared annually by ASNB, so the dividend actually credited may differ. For official
+          information, visit{" "}
+          <a href="https://www.asnb.com.my" target="_blank" rel="noopener noreferrer" className="text-action-link hover:underline">
+            asnb.com.my
+          </a>
+          .
         </footer>
       </main>
     </div>
